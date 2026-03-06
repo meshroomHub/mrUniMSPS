@@ -5,10 +5,10 @@
 ### Meshroom Plugin for Uni-MS-PS
 
 <p>
-Integrate <a href="https://github.com/Clement-Hardy/Uni-MS-PS">Uni-MS-PS</a> multi-view photometric stereo normal estimation directly into your <a href="https://github.com/alicevision/Meshroom">Meshroom</a> photogrammetry pipeline.
+Integrate <a href="https://github.com/meshroomHubWarehouse/Uni-MS-PS">Uni-MS-PS</a> multi-view photometric stereo normal estimation directly into your <a href="https://github.com/alicevision/Meshroom">Meshroom</a> photogrammetry pipeline.
 </p>
 
-<a href="https://github.com/Clement-Hardy/Uni-MS-PS"><img src="https://img.shields.io/badge/Core-Uni--MS--PS-green" alt="Uni-MS-PS" height="25"></a>
+<a href="https://github.com/meshroomHubWarehouse/Uni-MS-PS"><img src="https://img.shields.io/badge/Core-Uni--MS--PS-green" alt="Uni-MS-PS" height="25"></a>
 
 </div>
 
@@ -44,7 +44,7 @@ git clone https://github.com/meshroomHub/mrUniMSPS.git
 ### 2. Clone the Uni-MS-PS core code
 
 ```bash
-git clone https://github.com/Clement-Hardy/Uni-MS-PS.git
+git clone https://github.com/meshroomHubWarehouse/Uni-MS-PS.git
 ```
 
 > **Note:** for SfMData JSON support, use the `feat/sfm-inference` branch.
@@ -168,7 +168,7 @@ This work is supported by [**DOPAMIn**](https://www.cnrsinnovation.com/actualite
 
 | Project | Description |
 |---------|-------------|
-| [Uni-MS-PS](https://github.com/Clement-Hardy/Uni-MS-PS) | Unified multi-view and single-view photometric stereo |
+| [Uni-MS-PS](https://github.com/meshroomHubWarehouse/Uni-MS-PS) | Unified multi-view and single-view photometric stereo |
 | [mrSDMUniPS](https://github.com/meshroomHub/mrSDMUniPS) | Meshroom plugin for SDM-UniPS photometric stereo |
 | [mrOpenRNb](https://github.com/meshroomHub/mrOpenRNb) | Meshroom plugin for neural surface reconstruction from normals |
 
