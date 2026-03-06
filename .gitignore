@@ -1,0 +1,7 @@
+venv/
+bin
+lib
+lib64
+__pycache__/
+*.pyc
+cameras.sfm
