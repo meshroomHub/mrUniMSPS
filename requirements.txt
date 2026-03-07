@@ -1,6 +1,1 @@
-torch
-torchvision
-opencv-python
-scipy
-numpy
-tqdm
+uni_ms_ps @ git+https://github.com/meshroomHubWarehouse/Uni-MS-PS.git@meshroom

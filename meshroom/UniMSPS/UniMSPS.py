@@ -192,19 +192,23 @@ class UniMSPS(desc.Node):
                     "UNI_MS_PS_PATH is empty or not a valid directory. "
                     "Set it in config.json. Got: '{}'".format(uni_ms_ps_path))
 
-            # Import Uni-MS-PS modules upfront, then restore sys.path
+            # Import Uni-MS-PS modules (pip install or sys.path fallback)
             import sys
-            original_path = sys.path[:]
-            sys.path.insert(0, uni_ms_ps_path)
             try:
                 from inference_sfm import run_sfm_inference
                 from sfm_loader import load_sfm
-            except ImportError as e:
-                raise RuntimeError(
-                    "Failed to import from Uni-MS-PS at {}: {}".format(
-                        uni_ms_ps_path, e))
-            finally:
-                sys.path[:] = original_path
+            except ImportError:
+                original_path = sys.path[:]
+                sys.path.insert(0, uni_ms_ps_path)
+                try:
+                    from inference_sfm import run_sfm_inference
+                    from sfm_loader import load_sfm
+                except ImportError as e:
+                    raise RuntimeError(
+                        "Failed to import from Uni-MS-PS at {}: {}".format(
+                            uni_ms_ps_path, e))
+                finally:
+                    sys.path[:] = original_path
 
             # Device selection
             import torch
