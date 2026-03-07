@@ -221,11 +221,19 @@ class UniMSPS(desc.Node):
             output_folder = chunk.node.outputFolder.value
             os.makedirs(output_folder, exist_ok=True)
 
-            # Weights path
-            weights_path = os.path.join(uni_ms_ps_path, "weights")
+            # Weights path: try plugin dir first, then algo repo path
+            plugin_weights = os.path.abspath(os.path.join(
+                os.path.dirname(__file__), '..', '..', 'weights'))
+            if os.path.isdir(plugin_weights):
+                weights_path = plugin_weights
+            else:
+                weights_path = os.path.join(uni_ms_ps_path, "weights")
             if not os.path.isdir(weights_path):
                 raise RuntimeError(
-                    "Weights directory not found: {}".format(weights_path))
+                    "Weights directory not found. "
+                    "Run download_weights.sh or check UNI_MS_PS_PATH. "
+                    "Looked in: {} and {}".format(
+                        plugin_weights, weights_path))
 
             # Run inference
             chunk.logger.info("Starting Uni-MS-PS inference...")
