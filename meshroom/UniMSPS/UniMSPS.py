@@ -73,6 +73,15 @@ class UniMSPS(desc.Node):
             value=True,
             invalidate=False,
         ),
+        desc.ChoiceParam(
+            name="outputFormat",
+            label="Output Format",
+            description="Output image format: png16 (16-bit PNG) or "
+                        "exr (float32 EXR for true float normals).",
+            values=["png16", "exr"],
+            value="png16",
+            exclusive=True,
+        ),
         desc.File(
             name="uniMsPsPath",
             label="Uni-MS-PS Path",
@@ -109,7 +118,8 @@ class UniMSPS(desc.Node):
             label="Normal Maps",
             description="Normal map images.",
             semantic="image",
-            value="{nodeCacheFolder}/<VIEW_ID>.png",
+            value=lambda attr: "{nodeCacheFolder}/<VIEW_ID>." + (
+                "exr" if attr.node.outputFormat.value == "exr" else "png"),
             group="",
         ),
         desc.File(
@@ -251,6 +261,9 @@ class UniMSPS(desc.Node):
                 chunk.node.downscale.value))
             chunk.logger.info("  GPU: {}".format(use_cuda))
 
+            output_format = chunk.node.outputFormat.value
+            ext = ".exr" if output_format == "exr" else ".png"
+
             run_sfm_inference(
                 sfm_path=input_sfm,
                 output_folder=output_folder,
@@ -260,6 +273,7 @@ class UniMSPS(desc.Node):
                 downscale=chunk.node.downscale.value,
                 use_cuda=use_cuda,
                 weights_path=weights_path,
+                output_format=output_format,
             )
 
             chunk.logger.info("Inference done.")
@@ -270,7 +284,7 @@ class UniMSPS(desc.Node):
             # Create output SfMData for normal maps
             self._create_output_sfm(
                 sfm_data, output_folder,
-                "normalMaps", ".png", chunk.logger,
+                "normalMaps", ext, chunk.logger,
                 downscale=chunk.node.downscale.value)
 
         finally:
