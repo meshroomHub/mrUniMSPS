@@ -1,345 +1,116 @@
-__version__ = "1.0"
+__version__ = "2.0"
 
-import json
 import os
-from meshroom.core import desc
-from meshroom.core.utils import VERBOSE_LEVEL
 
-# Minimum number of views (illuminations) for a pose to be used for photometric stereo
-MIN_VIEWS_PER_POSE = 3
+from meshroom.core import desc
+
+from . import psCommon
+
+WEIGHTS_NAME = "model_uncalibrated.pth"
 
 
 class UniMSPS(desc.Node):
-    """
-    Multi-view photometric stereo normal estimation using Uni-MS-PS.
-
-    Reads an SfMData JSON with multi-lighting views grouped by poseId,
-    runs normal estimation per pose, and outputs normal maps with an
-    output JSON referencing all results.
-    """
+    """Multi-view photometric stereo normal estimation with Uni-MS-PS."""
 
     category = "Photometric Stereo"
     gpu = desc.Level.INTENSIVE
     size = desc.DynamicNodeSize("inputSfm")
 
     documentation = """
-    Estimate surface normals from multi-lighting images using Uni-MS-PS.
+Estimate one normal map per multi-lighting pose with Uni-MS-PS (universal photometric stereo: unknown lighting).
 
-    **Inputs:**
-    - SfMData JSON with views grouped by poseId (multi-lighting)
-    - Optional mask folder (masks named by poseId or viewId)
+**Inputs:** an SfMData where the lighting images of a pose share the same poseId (as created by CameraInit for
+multi-lighting folders), e.g. the undistorted images of ExportImages. Poses with fewer than 'Min Views Per Pose'
+views (photogrammetry images) are ignored, so a mixed multi-view / multi-light SfMData can be used as is.
 
-    Poses with fewer than 3 views are not multi-lighting poses (e.g. photogrammetry
-    views sharing the same SfMData): they are ignored.
+**Masks:** from a mask folder (<poseId>.png or <viewId>.png) or from the alpha channel of the images; the
+per-image masks of a pose are combined by vote ('Mask Vote Threshold').
 
-    **Processing:**
-    - Images are cropped around masks internally for efficiency
-    - Normal maps are uncropped back to full resolution transparently
+**Processing:** the images are cropped around the mask and padded with zeros to a square of side 32 * 2^k (k + 1
+resolution stages of the network): the GPU memory grows with the size of the object in the (downscaled) images.
 
-    **Outputs:**
-    - Normal map PNGs (16-bit) per pose
-    - JSON file mapping poseIds to normal map paths
-    """
+**Outputs:** one normal map per pose (<poseId>.png|exr, OpenGL camera frame by default), the pose masks
+(masks/<poseId>.png: pixels with a normal) and an SfMData referencing the normal maps (one view per pose, with the
+intrinsics scaled by the downscale factor), ready for RNb-NeuS2.
 
-    inputs = [
-        desc.File(
-            name="inputSfm",
-            label="Input SfMData",
-            description="SfMData JSON file with multi-lighting views "
-                        "grouped by poseId.",
-            value="",
-        ),
-        desc.File(
-            name="maskFolder",
-            label="Mask Folder",
-            description="Folder with mask PNGs named by poseId or viewId "
-                        "(e.g. '12345.png'). Optional.",
-            value="",
-        ),
+The data handling (SfMData, image selection, masks, outputs) is common to the LINOUniPS, UniMSPS and SDMUniPS
+nodes; see the advanced options.
+"""
+
+    inputs = psCommon.inputAttributes() + [
         desc.IntParam(
-            name="downscale",
-            label="Downscale Factor",
-            description="Integer downscale factor for input images "
-                        "(1 = original, 2 = half, 4 = quarter).",
-            value=1,
-            range=(1, 8, 1),
+            name="cropMargin",
+            label="Crop Margin",
+            description="Margin (pixels) around the bounding box of the mask (0: tight box, as the original "
+                        "Uni-MS-PS inference). The crop is padded with zeros to a square of side 32 * 2^k.",
+            value=0,
+            range=(0, 256, 1),
+            advanced=True,
         ),
-        desc.IntParam(
-            name="nbImages",
-            label="Number of Images",
-            description="Number of lighting images per pose to use "
-                        "(-1 = all).",
-            value=-1,
-            range=(-1, 200, 1),
-        ),
-        desc.BoolParam(
-            name="useGpu",
-            label="Use GPU",
-            description="Use GPU for inference.",
-            value=True,
-            invalidate=False,
-        ),
-        desc.ChoiceParam(
-            name="outputFormat",
-            label="Output Format",
-            description="Output image format: png16 (16-bit PNG) or "
-                        "exr (float32 EXR for true float normals).",
-            values=["png16", "exr"],
-            value="png16",
-            exclusive=True,
+        desc.File(
+            name="modelPath",
+            label="Model",
+            description="Uni-MS-PS uncalibrated weights (.pth). If empty: <plugin>/weights/" + WEIGHTS_NAME + ", then "
+                        "<Uni-MS-PS>/weights/" + WEIGHTS_NAME + ".",
+            value="",
+            advanced=True,
         ),
         desc.File(
             name="uniMsPsPath",
             label="Uni-MS-PS Path",
-            description="Path to Uni-MS-PS code directory. "
-                        "Set via config.json key UNI_MS_PS_PATH.",
+            description="Uni-MS-PS code directory, used if the package is not installed in the plugin environment.",
             value="${UNI_MS_PS_PATH}",
             advanced=True,
+            invalidate=False,
         ),
-        desc.ChoiceParam(
-            name="verboseLevel",
-            label="Verbose Level",
-            description="Verbosity level for logging.",
-            values=VERBOSE_LEVEL,
-            value="info",
-            exclusive=True,
-        ),
-    ]
+    ] + psCommon.advancedInputAttributes() + psCommon.settingsAttributes()
 
-    outputs = [
-        desc.File(
-            name="outputFolder",
-            label="Output Folder",
-            description="Folder containing normal map PNGs.",
-            value="{nodeCacheFolder}",
-        ),
-        desc.File(
-            name="outputSfmDataNormal",
-            label="SfMData Normal",
-            description="Output SfMData file referencing normal maps.",
-            value="{nodeCacheFolder}/normalMaps.sfm",
-        ),
-        desc.File(
-            name="normalMaps",
-            label="Normal Maps",
-            description="Normal map images.",
-            semantic="image",
-            value=lambda attr: "{nodeCacheFolder}/<VIEW_ID>." + (
-                "exr" if attr.node.outputFormat.value == "exr" else "png"),
-            group="",
-        ),
-        desc.File(
-            name="outputMaskFolder",
-            label="Mask Folder",
-            description="Folder with masks extracted from alpha channels.",
-            value="{nodeCacheFolder}/masks",
-            group="",
-        ),
-    ]
+    outputs = psCommon.outputAttributes()
 
     @staticmethod
-    def _scale_intrinsics(sfm, downscale):
-        """Scale intrinsics and view dimensions to match downscaled images."""
-        if downscale <= 1:
-            return
-        f = float(downscale)
-        for intr in sfm.get("intrinsics", []):
-            for key in ("width", "height"):
-                if key in intr:
-                    intr[key] = str(int(int(float(str(intr[key]))) / f))
-            if "principalPoint" in intr:
-                pp = intr["principalPoint"]
-                intr["principalPoint"] = [
-                    str(float(str(pp[0])) / f),
-                    str(float(str(pp[1])) / f),
-                ]
-            if "pxFocalLength" in intr:
-                pfl = intr["pxFocalLength"]
-                if isinstance(pfl, list):
-                    intr["pxFocalLength"] = [pfl[0] / f, pfl[1] / f]
-                else:
-                    intr["pxFocalLength"] = float(pfl) / f
-        for view in sfm.get("views", []):
-            for key in ("width", "height"):
-                if key in view:
-                    view[key] = str(int(int(float(str(view[key]))) / f))
+    def findWeights(node):
+        if node.modelPath.value:
+            return node.modelPath.value
+        candidates = [os.path.join(os.path.dirname(__file__), "..", "..", "weights", WEIGHTS_NAME)]
+        if node.uniMsPsPath.evalValue:
+            candidates.append(os.path.join(node.uniMsPsPath.evalValue, "weights", WEIGHTS_NAME))
+        for path in candidates:
+            if os.path.isfile(path):
+                return os.path.abspath(path)
+        raise RuntimeError("Uni-MS-PS weights not found, set 'Model' or download them (download_weights.sh). "
+                           "Searched: {}".format(", ".join(candidates)))
 
     @staticmethod
-    def _filter_photometric_poses(sfm, logger):
-        """Keep only the poses seen under several illuminations.
-
-        CameraInit groups the images of a "PS_*" folder under a single poseId, while
-        any other view (e.g. a photogrammetry image) has its own pose: poses with
-        fewer than MIN_VIEWS_PER_POSE views are dropped, so that a mixed multi-view /
-        multi-light SfMData can be used as is.
-        """
-        from collections import Counter
-        views = sfm.get("views", [])
-        nb_views_per_pose = Counter(str(v.get("poseId", "")) for v in views)
-        kept = {pose_id for pose_id, nb in nb_views_per_pose.items()
-                if nb >= MIN_VIEWS_PER_POSE}
-        if not kept:
-            raise RuntimeError(
-                "No pose with at least {} views in the input SfMData: "
-                "no multi-lighting data.".format(MIN_VIEWS_PER_POSE))
-
-        nb_ignored = len(nb_views_per_pose) - len(kept)
-        if nb_ignored:
-            logger.info(
-                "Ignoring {} pose(s) with fewer than {} views "
-                "(not multi-lighting poses).".format(
-                    nb_ignored, MIN_VIEWS_PER_POSE))
-        sfm["views"] = [v for v in views if str(v.get("poseId", "")) in kept]
-        sfm["poses"] = [p for p in sfm.get("poses", [])
-                        if str(p.get("poseId", "")) in kept]
-        return sfm
-
-    def _create_output_sfm(self, sfm_data, output_folder,
-                           map_type, suffix, logger, downscale=1):
-        """Create an output SfMData JSON that references generated map files."""
-        import copy
-        sfm = copy.deepcopy(sfm_data)
-
-        views = sfm.get("views", [])
-        representative_views = []
-        for view in views:
-            view_id = str(view.get("viewId", ""))
-            pose_id = str(view.get("poseId", ""))
-            if view_id == pose_id:
-                map_path = os.path.join(output_folder,
-                                        "{}{}".format(pose_id, suffix))
-                if not os.path.isfile(map_path):
-                    logger.warning(
-                        "No {} for pose {}: not referenced in the output "
-                        "SfMData.".format(map_type, pose_id))
-                    continue
-                view["path"] = map_path
-                representative_views.append(view)
-
-        sfm["views"] = representative_views
-        self._scale_intrinsics(sfm, downscale)
-
-        output_path = os.path.join(output_folder, "{}.sfm".format(map_type))
-        with open(output_path, "w") as f:
-            json.dump(sfm, f, indent=4)
-
-        logger.info("Saved {} to {}".format(map_type, output_path))
-        return output_path
+    def importApi(node):
+        try:
+            import meshroom_predict
+        except ImportError:
+            import sys
+            path = node.uniMsPsPath.evalValue
+            if not path or not os.path.isdir(path):
+                raise RuntimeError("Uni-MS-PS is not installed in the plugin environment and 'Uni-MS-PS Path' is "
+                                   "invalid: '{}'".format(path))
+            sys.path.insert(0, path)
+            import meshroom_predict
+        return meshroom_predict
 
     def processChunk(self, chunk):
         try:
             chunk.logManager.start(chunk.node.verboseLevel.value)
-
-            # Validate inputs
-            input_sfm = chunk.node.inputSfm.value
-            if not input_sfm:
-                raise RuntimeError("inputSfm is required but empty.")
-            if not os.path.exists(input_sfm):
-                raise RuntimeError(
-                    "Input SfM file not found: {}".format(input_sfm))
-
-            mask_folder = chunk.node.maskFolder.value or ""
-            if mask_folder and not os.path.isdir(mask_folder):
-                chunk.logger.warning(
-                    "Mask folder not found, continuing without masks: {}".format(mask_folder))
-                mask_folder = ""
-
-            # Resolve Uni-MS-PS path
-            uni_ms_ps_path = chunk.node.uniMsPsPath.evalValue
-            if not uni_ms_ps_path or not os.path.isdir(uni_ms_ps_path):
-                raise RuntimeError(
-                    "UNI_MS_PS_PATH is empty or not a valid directory. "
-                    "Set it in config.json. Got: '{}'".format(uni_ms_ps_path))
-
-            # Import Uni-MS-PS modules (pip install or sys.path fallback)
-            import sys
-            try:
-                from inference_sfm import run_sfm_inference
-                from sfm_loader import load_sfm
-            except ImportError:
-                original_path = sys.path[:]
-                sys.path.insert(0, uni_ms_ps_path)
-                try:
-                    from inference_sfm import run_sfm_inference
-                    from sfm_loader import load_sfm
-                except ImportError as e:
-                    raise RuntimeError(
-                        "Failed to import from Uni-MS-PS at {}: {}".format(
-                            uni_ms_ps_path, e))
-                finally:
-                    sys.path[:] = original_path
-
-            # Device selection
             import torch
-            use_gpu = chunk.node.useGpu.value
-            use_cuda = use_gpu and torch.cuda.is_available()
-            if use_gpu and not use_cuda:
-                chunk.logger.warning("CUDA not available, falling back to CPU")
+            node = chunk.node
+            api = self.importApi(node)
+            weights = self.findWeights(node)
+            chunk.logger.info("Uni-MS-PS weights: {}".format(weights))
+            predictor = api.loadModel(weights, useGpu=node.useGpu.value, logger=chunk.logger)
 
-            # Output folder
-            output_folder = chunk.node.outputFolder.value
-            os.makedirs(output_folder, exist_ok=True)
+            def predict(images, mask):
+                return api.predict(predictor, images, mask, cropMargin=node.cropMargin.value)
 
-            # Weights path: try plugin dir first, then algo repo path
-            plugin_weights = os.path.abspath(os.path.join(
-                os.path.dirname(__file__), '..', '..', 'weights'))
-            if os.path.isdir(plugin_weights):
-                weights_path = plugin_weights
-            else:
-                weights_path = os.path.join(uni_ms_ps_path, "weights")
-            if not os.path.isdir(weights_path):
-                raise RuntimeError(
-                    "Weights directory not found. "
-                    "Run download_weights.sh or check UNI_MS_PS_PATH. "
-                    "Looked in: {} and {}".format(
-                        plugin_weights, weights_path))
+            def cleanup():
+                if torch.cuda.is_available():
+                    torch.cuda.empty_cache()
 
-            # Run inference
-            chunk.logger.info("Starting Uni-MS-PS inference...")
-            chunk.logger.info("  Input SfM: {}".format(input_sfm))
-            chunk.logger.info("  Masks: {}".format(mask_folder or "(none)"))
-            chunk.logger.info("  Downscale: {}".format(
-                chunk.node.downscale.value))
-            chunk.logger.info("  GPU: {}".format(use_cuda))
-
-            output_format = chunk.node.outputFormat.value
-            ext = ".exr" if output_format == "exr" else ".png"
-
-            # Keep the multi-lighting poses only
-            sfm_data = self._filter_photometric_poses(
-                load_sfm(input_sfm), chunk.logger)
-            ps_sfm = os.path.join(output_folder, "photometricStereoViews.sfm")
-            with open(ps_sfm, "w") as f:
-                json.dump(sfm_data, f, indent=4)
-
-            run_sfm_inference(
-                sfm_path=ps_sfm,
-                output_folder=output_folder,
-                mask_folder=mask_folder if mask_folder else None,
-                mask_output_folder=chunk.node.outputMaskFolder.value,
-                nb_img=chunk.node.nbImages.value,
-                downscale=chunk.node.downscale.value,
-                use_cuda=use_cuda,
-                weights_path=weights_path,
-                output_format=output_format,
-            )
-
-            chunk.logger.info("Inference done.")
-
-            # Create output SfMData for normal maps
-            self._create_output_sfm(
-                sfm_data, output_folder,
-                "normalMaps", ext, chunk.logger,
-                downscale=chunk.node.downscale.value)
-
+            psCommon.processPoses(chunk, predict, cleanup=cleanup)
         finally:
-            # GPU cleanup
-            try:
-                import gc
-                import torch as _torch
-                gc.collect()
-                if _torch.cuda.is_available():
-                    _torch.cuda.empty_cache()
-            except Exception:
-                pass
             chunk.logManager.end()
