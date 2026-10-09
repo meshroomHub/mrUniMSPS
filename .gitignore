@@ -5,3 +5,7 @@ lib64
 __pycache__/
 *.pyc
 cameras.sfm
+
+# Packaging / model artefacts
+*.egg-info/
+weights/

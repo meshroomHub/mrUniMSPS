@@ -50,12 +50,14 @@ source venv/bin/activate
 
 pip install --upgrade pip
 pip install torch torchvision
-pip install -r requirements.txt
+pip install -e .
 
 deactivate
 ```
 
-This installs Uni-MS-PS and all its dependencies automatically via pip.
+The plugin's `pyproject.toml` installs Uni-MS-PS and its dependencies. Meshroom
+still discovers the node from this repository via `MESHROOM_PLUGINS_PATH`;
+`requirements.txt` is retained for older installation workflows.
 
 ### 3. Download pretrained weights
 
@@ -175,7 +177,8 @@ mrUniMSPS/
 │   └── model_uncalibrated.pth
 ├── venv/                          # Python virtual environment
 ├── download_weights.sh            # Weight download script
-├── requirements.txt               # Python dependencies (pip install from git)
+├── pyproject.toml                 # Plugin dependency metadata
+├── requirements.txt               # Legacy dependency list
 └── README.md
 ```
 
