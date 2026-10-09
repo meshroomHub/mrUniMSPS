@@ -1,4 +1,6 @@
 __version__ = "2.0"
+__author__ = "Baptiste Brument"
+__license__ = "MPL-2.0"
 
 import os
 
@@ -11,6 +13,14 @@ WEIGHTS_NAME = "model_uncalibrated.pth"
 
 class UniMSPS(desc.Node):
     """Multi-view photometric stereo normal estimation with Uni-MS-PS."""
+
+    # Credits of the wrapped method (shown in the node info, with the plugin author and license)
+    __nodeInfo__ = [
+        ("method", "Uni MS-PS: a Multi-Scale Encoder Decoder Transformer for Universal Photometric Stereo "
+                   "(C. Hardy, Y. Quéau, D. Tschumperlé)"),
+        ("methodLicense", "none specified in the original repository"),
+        ("methodRepository", "https://github.com/Clement-Hardy/Uni-MS-PS"),
+    ]
 
     category = "Photometric Stereo"
     gpu = desc.Level.INTENSIVE
