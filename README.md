@@ -149,7 +149,7 @@ defaults and behaviour in the three nodes.
 
 If you prefer to work from a local Uni-MS-PS clone instead of pip install:
 
-1. Clone the repo: `git clone -b meshroom https://github.com/meshroomHubWarehouse/Uni-MS-PS.git`
+1. Clone the repo: `git clone https://github.com/meshroomHubWarehouse/Uni-MS-PS.git`
 2. Edit `meshroom/config.json`:
    ```json
    [

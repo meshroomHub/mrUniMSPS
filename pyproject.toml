@@ -12,7 +12,7 @@ license = {text = "MPL-2.0"}
 authors = [{name = "Baptiste Brument"}]
 dependencies = [
     "psutil",
-    "uni-ms-ps @ git+https://github.com/meshroomHubWarehouse/Uni-MS-PS.git@meshroom",
+    "uni-ms-ps @ git+https://github.com/meshroomHubWarehouse/Uni-MS-PS.git@main",
 ]
 
 # Meshroom discovers the node from MESHROOM_PLUGINS_PATH, not site-packages.
