@@ -1,21 +1,44 @@
-[build-system]
-requires = ["setuptools>=68", "wheel"]
-build-backend = "setuptools.build_meta"
-
 [project]
-name = "mr-uni-ms-ps"
+name = "mrUniMSPS"
 version = "2.0.0"
-description = "Meshroom plugin for Uni-MS-PS universal photometric stereo"
+description = "Meshroom plugin for Uni-MS-PS universal photometric stereo."
 readme = "README.md"
 requires-python = ">=3.10"
 license = {text = "MPL-2.0"}
 authors = [{name = "Baptiste Brument"}]
 dependencies = [
+    "numpy<2", # pyalicevision is built against NumPy 1.x.
+    "torch",
+    "torchvision",
     "psutil",
-    "uni-ms-ps @ git+https://github.com/meshroomHubWarehouse/Uni-MS-PS.git@main",
+    "uni-ms-ps",
 ]
 
 # Meshroom discovers the node from MESHROOM_PLUGINS_PATH, not site-packages.
-# This distribution installs the plugin's dependencies into its venv.
-[tool.setuptools]
-packages = []
+# uv only installs the plugin's dependencies into its venv.
+[tool.uv]
+package = false
+
+[tool.uv.sources]
+torch = { index = "pytorch-cu121" }
+torchvision = { index = "pytorch-cu121" }
+uni-ms-ps = { git = "https://github.com/meshroomHubWarehouse/Uni-MS-PS.git", branch = "main" }
+
+[[tool.uv.index]]
+name = "pytorch-cu121"
+url = "https://download.pytorch.org/whl/cu121"
+explicit = true
+
+[tool.meshroom]
+publisher = "meshroomHub"
+requirements = "Nvidia GPU with CUDA >= 12.X."
+
+# If you prefer to work from a local Uni-MS-PS
+# env = [ { key = "UNI_MS_PS_PATH", type = "path", value = "/path/to/Uni-MS-PS" } ]
+
+# [[tool.meshroom.assets]]
+# name = "Uni-MS-PS_pretrained_weights"
+# category = "Weights"
+# path = "weights/model_uncalibrated.pth"
+# url = "https://example.com/path/to/model_uncalibrated.pt"
+# sha256 = ""
