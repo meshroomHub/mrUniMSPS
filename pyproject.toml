@@ -36,9 +36,10 @@ requirements = "Nvidia GPU with CUDA >= 12.X."
 # If you prefer to work from a local Uni-MS-PS
 # env = [ { key = "UNI_MS_PS_PATH", type = "path", value = "/path/to/Uni-MS-PS" } ]
 
-# [[tool.meshroom.assets]]
-# name = "Uni-MS-PS_pretrained_weights"
-# category = "Weights"
-# path = "weights/model_uncalibrated.pth"
-# url = "https://example.com/path/to/model_uncalibrated.pt"
-# sha256 = ""
+[[tool.meshroom.assets]]
+name = "Uni-MS-PS_pretrained_weights"
+category = "Weights"
+path = "weights/model_uncalibrated.pth"
+url = "https://github.com/meshroomHubWarehouse/Uni-MS-PS/releases/download/weights-v1/model_uncalibrated.pth"
+sha256 = "314d2cd36a5e84ec5eddac32cc17df987981574b43b976d6aa7048124162fc21"
+sizeMB = 317
