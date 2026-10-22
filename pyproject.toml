@@ -22,7 +22,7 @@ package = false
 [tool.uv.sources]
 torch = { index = "pytorch-cu121" }
 torchvision = { index = "pytorch-cu121" }
-uni-ms-ps = { git = "https://github.com/meshroomHubWarehouse/Uni-MS-PS.git", branch = "main" }
+uni-ms-ps = { git = "https://github.com/meshroomHubWarehouse/Uni-MS-PS.git", tag = "weights-v1" }
 
 [[tool.uv.index]]
 name = "pytorch-cu121"
