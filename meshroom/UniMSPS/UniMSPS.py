@@ -87,7 +87,7 @@ nodes; see the advanced options.
         for path in candidates:
             if os.path.isfile(path):
                 return os.path.abspath(path)
-        raise RuntimeError("Uni-MS-PS weights not found, set 'Model' or download them (download_weights.sh). "
+        raise RuntimeError("Uni-MS-PS weights not found, set 'Model' or download them (see README). "
                            "Searched: {}".format(", ".join(candidates)))
 
     @staticmethod

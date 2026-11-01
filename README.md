@@ -61,11 +61,17 @@ still discovers the node from this repository via `MESHROOM_PLUGINS_PATH`;
 
 ### 3. Download pretrained weights
 
+When the plugin is installed by Meshroom, the installer downloads the uncalibrated model weights (~317 MB) declared
+in `[[tool.meshroom.assets]]` of `pyproject.toml` and checks their sha256. For a manual install:
+
 ```bash
-bash download_weights.sh
+mkdir -p weights
+curl -L -o weights/model_uncalibrated.pth \
+    https://github.com/meshroomHubWarehouse/Uni-MS-PS/releases/download/weights-v1/model_uncalibrated.pth
+echo "314d2cd36a5e84ec5eddac32cc17df987981574b43b976d6aa7048124162fc21  weights/model_uncalibrated.pth" | sha256sum -c
 ```
 
-This downloads the uncalibrated model weights (~303 MB) from Google Drive into `weights/`:
+This is a mirror of the weights linked from the [Uni-MS-PS](https://github.com/Clement-Hardy/Uni-MS-PS) README:
 
 ```
 weights/
@@ -73,8 +79,6 @@ weights/
 ```
 
 The plugin auto-detects this directory. No config.json needed.
-
-> **Note:** if the download fails (Google Drive quota), install [gdown](https://github.com/wkentaro/gdown) (`pip install gdown`) and re-run the script.
 
 ### 4. Register the plugin in Meshroom
 
@@ -173,10 +177,9 @@ mrUniMSPS/
 │       ├── UniMSPS.py             # Meshroom node definition
 │       └── psCommon.py            # Common photometric stereo data handling (shared copy)
 ├── tests/                         # Unit tests (pytest) and real pose check (check_real_pose.py)
-├── weights/                       # Downloaded model weights
+├── weights/                       # Model weights (Meshroom asset)
 │   └── model_uncalibrated.pth
 ├── venv/                          # Python virtual environment
-├── download_weights.sh            # Weight download script
 ├── pyproject.toml                 # Plugin dependency metadata
 ├── requirements.txt               # Legacy dependency list
 └── README.md
