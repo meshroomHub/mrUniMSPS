@@ -1,2 +1,0 @@
-psutil
-uni_ms_ps @ git+https://github.com/meshroomHubWarehouse/Uni-MS-PS.git@main

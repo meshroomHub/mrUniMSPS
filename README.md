@@ -22,71 +22,80 @@ Integrate <a href="https://github.com/meshroomHubWarehouse/Uni-MS-PS">Uni-MS-PS<
 
 ## Requirements
 
-- **Python** 3.10+
-- **CUDA** 12.x + NVIDIA GPU
-- **[Meshroom](https://github.com/alicevision/Meshroom)** 2025+ (develop branch)
+- **[Meshroom](https://github.com/alicevision/Meshroom)** 2026.1 or later (develop branch until its release):
+  Meshroom 2025.1.x has neither the plugin manager nor the `[tool.meshroom]` settings of `pyproject.toml`
+- **NVIDIA GPU** with a driver supporting CUDA 12.1
+- **Python** 3.10 or newer
+
+All Python dependencies are declared in [`pyproject.toml`](pyproject.toml): PyTorch (CUDA 12.1) and `uni-ms-ps`, pinned to the
+`weights-v1` tag of [meshroomHubWarehouse/Uni-MS-PS](https://github.com/meshroomHubWarehouse/Uni-MS-PS), a fork of
+[Clement-Hardy/Uni-MS-PS](https://github.com/Clement-Hardy/Uni-MS-PS).
 
 ---
 
-## Quick Start
+## Installation
 
-> **Prerequisite:** a working [Meshroom](https://github.com/alicevision/Meshroom) installation.
+### With the plugin manager
 
-### 1. Clone the plugin
+From Meshroom's plugin manager (*Manage Plugins*), or from the command line:
 
 ```bash
-cd /path/to/your/plugins
+meshroom_plugins install mrUniMSPS
+```
+
+The installer creates the plugin `venv/` with `uv sync` and downloads the uncalibrated model weights (~317 MB), declared as assets in
+`pyproject.toml`, checking their SHA-256. The **UniMSPS** node then appears under the **Photometric Stereo** category.
+
+### Manual install (without the plugin manager)
+
+Requires [uv](https://docs.astral.sh/uv/).
+
+```bash
+cd /path/to/plugins
 git clone https://github.com/meshroomHub/mrUniMSPS.git
 cd mrUniMSPS
-```
+UV_PROJECT_ENVIRONMENT=venv uv sync   # Meshroom looks for venv/ at the plugin root
 
-### 2. Set up the virtual environment
-
-Meshroom looks for a folder named **`venv`** at the plugin root.
-
-```bash
-python3 -m venv venv
-source venv/bin/activate
-
-pip install --upgrade pip
-pip install torch torchvision
-pip install -e .
-
-deactivate
-```
-
-The plugin's `pyproject.toml` installs Uni-MS-PS and its dependencies. Meshroom
-still discovers the node from this repository via `MESHROOM_PLUGINS_PATH`;
-`requirements.txt` is retained for older installation workflows.
-
-### 3. Download pretrained weights
-
-When the plugin is installed by Meshroom, the installer downloads the uncalibrated model weights (~317 MB) declared
-in `[[tool.meshroom.assets]]` of `pyproject.toml` and checks their sha256. For a manual install:
-
-```bash
 mkdir -p weights
 curl -L -o weights/model_uncalibrated.pth \
     https://github.com/meshroomHubWarehouse/Uni-MS-PS/releases/download/weights-v1/model_uncalibrated.pth
 echo "314d2cd36a5e84ec5eddac32cc17df987981574b43b976d6aa7048124162fc21  weights/model_uncalibrated.pth" | sha256sum -c
+
+export MESHROOM_PLUGINS_PATH=/path/to/plugins/mrUniMSPS:$MESHROOM_PLUGINS_PATH
 ```
 
-This is a mirror of the weights linked from the [Uni-MS-PS](https://github.com/Clement-Hardy/Uni-MS-PS) README:
+On Windows (PowerShell): `$env:UV_PROJECT_ENVIRONMENT = "venv"; uv sync`, then
+`$env:MESHROOM_PLUGINS_PATH = "C:\path\to\plugins\mrUniMSPS"`.
 
-```
-weights/
-└── model_uncalibrated.pth
-```
+The weights mirror those linked from the [Uni-MS-PS](https://github.com/Clement-Hardy/Uni-MS-PS) README; the plugin finds
+them in `weights/`.
 
-The plugin auto-detects this directory. No config.json needed.
+### Working on a local Uni-MS-PS clone
 
-### 4. Register the plugin in Meshroom
+The node imports Uni-MS-PS from the plugin `venv/`. To run a local clone instead, install it in editable mode in that venv:
 
 ```bash
-export MESHROOM_PLUGINS_PATH=/path/to/your/plugins/mrUniMSPS:$MESHROOM_PLUGINS_PATH
+uv pip install --python venv/bin/python -e /path/to/Uni-MS-PS
 ```
 
-Launch Meshroom: the **UniMSPS** node appears under **Photometric Stereo**.
+Updating or reinstalling the plugin from the plugin manager recreates `venv/`: run this command again afterwards.
+`UNI_MS_PS_PATH` (an environment variable, or the `uniMsPsPath` input of the node) is only a fallback: the node uses it when
+Uni-MS-PS is not installed in the venv.
+
+---
+
+## Pipeline template
+
+`meshroom/uniMsPs.mgt` (*File > New Pipeline > Uni Ms Ps*) runs the structure-from-motion of AliceVision, segments the
+object with SAM 3, exports the undistorted images and estimates the normals with `UniMSPS`.
+
+It needs [mrSegmentation](https://github.com/meshroomHub/mrSegmentation) (node `ImageSegmentationSam3`), not in the
+plugin registry yet: install it by hand.
+
+Images: one folder per pose, holding the single-light images and one reference image lit by all the lights, whose
+filename contains `ambient` (CameraInit makes it the pose reference) and `all_leds` (`SfMFilter_1` keeps these images
+for the structure from motion and the segmentation). Set the SAM 3 prompt (`ImageSegmentationSam3_1`, default `stone`)
+to your object.
 
 ---
 
@@ -149,20 +158,14 @@ defaults and behaviour in the three nodes.
 
 ---
 
-## Advanced: Developer Setup
+## Tests
 
-If you prefer to work from a local Uni-MS-PS clone instead of pip install:
-
-1. Clone the repo: `git clone https://github.com/meshroomHubWarehouse/Uni-MS-PS.git`
-2. Edit `meshroom/config.json`:
-   ```json
-   [
-       {"key": "UNI_MS_PS_PATH", "type": "path", "value": "/path/to/Uni-MS-PS"}
-   ]
-   ```
-3. Place weights in the `weights/` directory of the Uni-MS-PS clone.
-
-The node tries pip imports first, then falls back to the config path.
+```bash
+# unit tests (CPU), from the plugin root
+PYTHONPATH=/path/to/Meshroom venv/bin/python -m pytest tests
+# one real pose (GPU): checks sizes, mask coverage and the OpenGL frame of the normals
+PYTHONPATH=/path/to/Meshroom venv/bin/python tests/check_real_pose.py <sfm> <poseId> <outputFolder> --downscale 2
+```
 
 ---
 
@@ -171,7 +174,7 @@ The node tries pip imports first, then falls back to the config path.
 ```
 mrUniMSPS/
 ├── meshroom/
-│   ├── config.json                # Plugin configuration (optional for dev)
+│   ├── uniMsPs.mgt                # Pipeline template
 │   └── UniMSPS/
 │       ├── __init__.py
 │       ├── UniMSPS.py             # Meshroom node definition
@@ -179,9 +182,8 @@ mrUniMSPS/
 ├── tests/                         # Unit tests (pytest) and real pose check (check_real_pose.py)
 ├── weights/                       # Model weights (Meshroom asset)
 │   └── model_uncalibrated.pth
-├── venv/                          # Python virtual environment
-├── pyproject.toml                 # Plugin dependency metadata
-├── requirements.txt               # Legacy dependency list
+├── venv/                          # Created by the installer or by uv sync
+├── pyproject.toml                 # Dependencies and Meshroom settings (uv)
 └── README.md
 ```
 
@@ -205,8 +207,11 @@ This work is supported by [**DOPAMIn**](https://www.cnrsinnovation.com/actualite
 | Project | Description |
 |---------|-------------|
 | [Uni-MS-PS](https://github.com/meshroomHubWarehouse/Uni-MS-PS) | Unified multi-view and single-view photometric stereo |
+| [mrLINOUniPS](https://github.com/meshroomHub/mrLINOUniPS) | Meshroom plugin for LINO-UniPS photometric stereo |
 | [mrSDMUniPS](https://github.com/meshroomHub/mrSDMUniPS) | Meshroom plugin for SDM-UniPS photometric stereo |
-| [mrOpenRNb](https://github.com/meshroomHub/mrOpenRNb) | Meshroom plugin for neural surface reconstruction from normals |
+| [mrLedGetter](https://github.com/meshroomHub/mrLedGetter) | Meshroom plugin for LED-getter near-light photometric stereo |
+| [mrRNbNeuS2](https://github.com/meshroomHub/mrRNbNeuS2) | Meshroom plugin for RNb-NeuS2 neural surface reconstruction |
+| [mrOpenRNb](https://github.com/meshroomHub/mrOpenRNb) | Meshroom plugin for Open-RNb neural surface reconstruction |
 
 ---
 
