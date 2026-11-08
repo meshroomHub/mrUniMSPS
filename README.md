@@ -126,6 +126,7 @@ defaults and behaviour in the three nodes.
 | Parameter | Label | Description |
 |-----------|-------|-------------|
 | `minViewsPerPose` | Min Views Per Pose | Minimum number of views sharing a poseId for a multi-lighting pose (default: 3) |
+| `requireLocalizedPoses` | Require Localized Poses | Process only the poses with a camera pose in the SfMData; false for photometric stereo without SfM, e.g. on the CameraInit output (default: true) |
 | `imageSelection` | Image Selection | `random` (reproducible, default), `uniform` or `first` images when `nbImages` is lower than the number of images |
 | `seed` | Seed | Seed of the image selection and of the network, combined with the poseId (default: 42) |
 | `linearizeInput` | Linearize Input | Convert 8/16-bit images from sRGB to linear (default: false) |
