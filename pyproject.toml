@@ -1,6 +1,6 @@
 [project]
 name = "mrUniMSPS"
-version = "2.0.3"
+version = "2.0.4"
 description = "Meshroom plugin for Uni-MS-PS universal photometric stereo."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -8,8 +8,8 @@ license = {text = "MPL-2.0"}
 authors = [{name = "Baptiste Brument"}]
 dependencies = [
     "numpy<2", # pyalicevision is built against NumPy 1.x.
-    "torch",
-    "torchvision",
+    "torch>=2.7,<2.8", # cu128 wheels: Blackwell (sm_120) support.
+    "torchvision>=0.22,<0.23",
     "psutil",
     "uni-ms-ps",
 ]
@@ -20,18 +20,18 @@ dependencies = [
 package = false
 
 [tool.uv.sources]
-torch = { index = "pytorch-cu121" }
-torchvision = { index = "pytorch-cu121" }
+torch = { index = "pytorch-cu128" }
+torchvision = { index = "pytorch-cu128" }
 uni-ms-ps = { git = "https://github.com/meshroomHubWarehouse/Uni-MS-PS.git", tag = "weights-v1" }
 
 [[tool.uv.index]]
-name = "pytorch-cu121"
-url = "https://download.pytorch.org/whl/cu121"
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
 explicit = true
 
 [tool.meshroom]
 publisher = "meshroomHub"
-requirements = "Nvidia GPU with CUDA >= 12.X."
+requirements = "Nvidia GPU, Turing or newer (compute capability >= 7.5), with a driver supporting CUDA 12.8 (R570 or newer)."
 
 # If you prefer to work from a local Uni-MS-PS
 # env = [ { key = "UNI_MS_PS_PATH", type = "path", value = "/path/to/Uni-MS-PS" } ]
