@@ -18,10 +18,10 @@ mrLedGetter, through the shared `psCommon.py` layer), and its outputs are ready 
 - **[Meshroom](https://github.com/alicevision/Meshroom)** 2026.1 or later (develop branch until its release, tested on
   commit [`edc4b6a2`](https://github.com/alicevision/Meshroom/commit/edc4b6a2)): Meshroom 2025.1.x has neither the plugin
   manager nor the `[tool.meshroom]` settings of `pyproject.toml`
-- **NVIDIA GPU** with a driver supporting CUDA 12.1
+- **NVIDIA GPU**, Turing or newer (compute capability 7.5 or higher), with a driver supporting CUDA 12.8 (R570 or newer)
 - **Python** 3.10 or newer
 
-All Python dependencies are declared in [`pyproject.toml`](pyproject.toml): PyTorch (CUDA 12.1) and `uni-ms-ps`, pinned to the
+All Python dependencies are declared in [`pyproject.toml`](pyproject.toml) and locked in [`uv.lock`](uv.lock): PyTorch 2.7 (CUDA 12.8) and `uni-ms-ps`, pinned to the
 `weights-v1` tag of [meshroomHubWarehouse/Uni-MS-PS](https://github.com/meshroomHubWarehouse/Uni-MS-PS), a fork of
 [Clement-Hardy/Uni-MS-PS](https://github.com/Clement-Hardy/Uni-MS-PS).
 
@@ -197,6 +197,7 @@ mrUniMSPS/
 │   └── model_uncalibrated.pth
 ├── venv/                          # Created by the installer or by uv sync
 ├── pyproject.toml                 # Dependencies and Meshroom settings (uv)
+├── uv.lock                        # Locked dependency versions (uv sync --frozen)
 └── README.md
 ```
 
